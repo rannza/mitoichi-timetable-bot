@@ -2,6 +2,11 @@
 name: Timetable BOT
 
 on:
+  # 5分ごとに自動実行
+  schedule:
+    - cron: "*/5 * * * *"
+
+  # 手動実行も残す
   workflow_dispatch:
 
 permissions:
@@ -23,25 +28,21 @@ jobs:
       - name: Pillowをインストール
         run: pip install Pillow
 
-      - name: 時間割画像を4分割
+      - name: 時間割画像を確認・分割
+        id: split
         run: python scripts/split_timetable.py
 
       - name: GitHubに画像を保存
+        if: steps.split.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add output/*.png
+
+          git add output/*.png state/source.sha256
+
           if git diff --cached --quiet; then
-            echo "画像に変更はありません。"
+            echo "保存する変更はありません。"
           else
             git commit -m "Update timetable images"
             git push
           fi
-
-      - name: 生成したPNGを保存
-        uses: actions/upload-artifact@v4
-        with:
-          name: timetable-images
-          path: output/*.png
-          if-no-files-found: error
-          retention-days: 7
