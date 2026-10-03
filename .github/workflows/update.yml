@@ -1,0 +1,15 @@
+
+name: Timetable BOT
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check execution
+        run: echo "Timetable BOT is ready!"
