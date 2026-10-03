@@ -28,6 +28,12 @@ IMAGE_PATH = "xl/media/image1.jpg"
 EXPECTED_SIZE = (960, 720)
 CROP_SIZE = (468, 302)
 
+# Apple Watch用画像の設定
+WATCH_CROP_TOP = 45
+WATCH_WIDTH = 710
+WATCH_HEIGHT = 257
+WATCH_LEFT_MARGIN = 121
+
 # 元画像から切り出す範囲
 REGIONS = {
     "jh": (5, 10, 473, 312),
@@ -47,6 +53,44 @@ def set_output(name, value):
     if output_file:
         with open(output_file, "a", encoding="utf-8") as f:
             f.write(f"{name}={value}\n")
+
+
+# ========================================
+# 出力画像の状態を確認
+# ========================================
+
+def check_outputs():
+
+    # 4枚の通常画像が存在するか確認
+    normal_images_exist = all(
+        (OUTPUT_DIR / f"{name}.png").exists()
+        for name in REGIONS
+    )
+
+    if not normal_images_exist:
+        return False
+
+    # Apple Watch用画像の存在とサイズを確認
+    watch_path = OUTPUT_DIR / "h1_watch.png"
+
+    if not watch_path.exists():
+        return False
+
+    try:
+        with Image.open(watch_path) as check:
+
+            check.load()
+
+            if check.format != "PNG":
+                return False
+
+            if check.size != (WATCH_WIDTH, WATCH_HEIGHT):
+                return False
+
+    except Exception:
+        return False
+
+    return True
 
 
 # ========================================
@@ -90,13 +134,10 @@ def main():
             encoding="utf-8"
         ).strip()
 
-    # 出力画像がすべて存在するか確認
-    outputs_exist = all(
-        (OUTPUT_DIR / f"{name}.png").exists()
-        for name in REGIONS
-    ) and (OUTPUT_DIR / "h1_watch.png").exists()
+    # 出力画像の状態を確認
+    outputs_exist = check_outputs()
 
-    # 画像に変更がなければ処理を省略
+    # 画像に変更がなく、出力画像も正常なら処理を省略
     if current_hash == previous_hash and outputs_exist:
 
         print("画像に変更はありません。")
@@ -195,27 +236,27 @@ def main():
                         "h1.png のサイズが想定と異なります。"
                     )
 
-                # 上部45pxを削除
-                # 元画像468x302px → 468x257px
+                # 上部45pxだけを削除
+                # 468x302px → 468x257px
                 cropped = watch_source.crop(
-                    (0, 95, 468, 302)
+                    (0, WATCH_CROP_TOP, 468, 302)
                 )
 
-                if cropped.size != (468, 207):
+                if cropped.size != (468, 257):
                     raise ValueError(
-                        "上部95px削除後のサイズが異なります。"
+                        "上部45px削除後のサイズが異なります。"
                     )
 
                 # 左右に121pxずつ白い余白を追加
                 watch_image = Image.new(
                     "RGB",
-                    (710, 207),
+                    (WATCH_WIDTH, WATCH_HEIGHT),
                     (255, 255, 255)
                 )
 
                 watch_image.paste(
                     cropped,
-                    (121, 0)
+                    (WATCH_LEFT_MARGIN, 0)
                 )
 
                 # 一時ファイルとして保存
@@ -230,7 +271,7 @@ def main():
 
                     check.load()
 
-                    if check.size != (710, 207):
+                    if check.size != (WATCH_WIDTH, WATCH_HEIGHT):
                         raise ValueError(
                             "h1_watch.png のサイズが異なります。"
                         )
@@ -245,7 +286,10 @@ def main():
                     OUTPUT_DIR / "h1_watch.png"
                 )
 
-                print("生成成功: h1_watch.png 710x207")
+                print(
+                    f"生成成功: h1_watch.png "
+                    f"{WATCH_WIDTH}x{WATCH_HEIGHT}"
+                )
 
         finally:
 
@@ -280,7 +324,7 @@ def main():
     print("\n===== 更新完了 =====")
 
     print("jh.png / h2.png / h1.png / h3.png")
-    print("h1_watch.png 710x207px")
+    print("h1_watch.png 710x257px")
 
     print("すべての画像の生成が完了しました。")
 
