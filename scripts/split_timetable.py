@@ -17,7 +17,7 @@ OUTPUT_DIR = Path("output")
 IMAGE_PATH = "xl/media/image1.jpg"
 
 EXPECTED_SIZE = (960, 720)
-CROP_SIZE = (470, 320)
+CROP_SIZE = (470, 290)
 
 
 def main():
@@ -60,10 +60,10 @@ def main():
 
         # 4つの領域を定義
         regions = {
-            "jh": (5, 5, 475, 325),
-            "h2": (485, 5, 955, 325),
-            "h1": (5, 365, 475, 685),
-            "h3": (485, 365, 955, 685),
+            "jh": (5, 5, 475, 295),
+            "h2": (485, 5, 955, 295),
+            "h1": (5, 365, 475, 655),
+            "h3": (485, 365, 955, 655),
         }
 
         # すべて一時領域で生成・検証してから出力する
@@ -122,7 +122,7 @@ def main():
 
     print("\n===== 生成完了 =====")
     print("jh.png / h2.png / h1.png / h3.png")
-    print("すべて470x320pxのPNGです。")
+    print("すべて470x290pxのPNGです。")
 
 
 if __name__ == "__main__":
