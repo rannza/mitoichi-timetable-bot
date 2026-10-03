@@ -8,8 +8,22 @@ permissions:
   contents: write
 
 jobs:
-  test:
+  inspect:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check execution
-        run: echo "Timetable BOT is ready!"
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 必要なライブラリをインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install openpyxl
+
+      - name: 時間割Excelを検査
+        run: python scripts/inspect_timetable.py
