@@ -1,13 +1,15 @@
 
 import urllib.request
+import zipfile
 from io import BytesIO
-from openpyxl import load_workbook
 
-# 時間割が掲載されているGoogleスプレッドシート
 SHEET_ID = "1fdSGqT1s2kit91TcQV_mjcuvOawGAU6JZ_5N684bH3U"
 
-# Excel形式でダウンロード
-URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
+URL = (
+    f"https://docs.google.com/spreadsheets/d/"
+    f"{SHEET_ID}/export?format=xlsx"
+)
+
 
 def main():
     print("時間割Excelの取得を開始します。")
@@ -22,35 +24,52 @@ def main():
 
     print(f"ダウンロード成功: {len(excel_data):,} bytes")
 
-    # Excelファイルを読み込む
-    workbook = load_workbook(
-        BytesIO(excel_data),
-        data_only=True
-    )
+    with zipfile.ZipFile(BytesIO(excel_data)) as archive:
+        files = archive.namelist()
 
-    print(f"シート数: {len(workbook.worksheets)}")
+        print("\n===== Excel内部ファイル一覧 =====")
 
-    total_images = 0
+        for name in files:
+            if (
+                name.startswith("xl/media/")
+                or name.startswith("xl/drawings/")
+                or name.startswith("xl/worksheets/_rels/")
+                or name.startswith("xl/embeddings/")
+                or name.startswith("customXml/")
+            ):
+                info = archive.getinfo(name)
 
-    for sheet in workbook.worksheets:
-        images = getattr(sheet, "_images", [])
+                print(
+                    f"{name} "
+                    f"({info.file_size:,} bytes)"
+                )
 
-        print(f"\nシート名: {sheet.title}")
-        print(f"画像数: {len(images)}")
+        print("\n===== 画像データの検査 =====")
 
-        for index, img in enumerate(images, start=1):
-            image_data = img._data()
+        media_files = [
+            name for name in files
+            if name.startswith("xl/media/")
+        ]
 
-            print(f"  画像 {index}")
-            print(f"  形式: {img.format}")
-            print(f"  幅: {img.width}px")
-            print(f"  高さ: {img.height}px")
-            print(f"  データサイズ: {len(image_data):,} bytes")
-            print(f"  先頭データ: {image_data[:8].hex()}")
+        if not media_files:
+            print("xl/media 内に画像ファイルはありません。")
 
-            total_images += 1
+        for name in media_files:
+            data = archive.read(name)
 
-    print(f"\n検査完了。合計画像数: {total_images}")
+            print(f"\nファイル名: {name}")
+            print(f"サイズ: {len(data):,} bytes")
+            print(f"先頭データ: {data[:16].hex()}")
+
+            if data.startswith(b"\xff\xd8\xff"):
+                print("形式: JPEG")
+            elif data.startswith(b"\x89PNG\r\n\x1a\n"):
+                print("形式: PNG")
+            else:
+                print("形式: その他・未判定")
+
+    print("\n===== 調査完了 =====")
+
 
 if __name__ == "__main__":
     main()
