@@ -198,18 +198,18 @@ def main():
                 # 上部45pxを削除
                 # 元画像468x302px → 468x257px
                 cropped = watch_source.crop(
-                    (0, 45, 468, 302)
+                    (0, 95, 468, 302)
                 )
 
-                if cropped.size != (468, 257):
+                if cropped.size != (468, 207):
                     raise ValueError(
-                        "上部45px削除後のサイズが異なります。"
+                        "上部95px削除後のサイズが異なります。"
                     )
 
                 # 左右に121pxずつ白い余白を追加
                 watch_image = Image.new(
                     "RGB",
-                    (710, 257),
+                    (710, 207),
                     (255, 255, 255)
                 )
 
@@ -230,7 +230,7 @@ def main():
 
                     check.load()
 
-                    if check.size != (710, 257):
+                    if check.size != (710, 207):
                         raise ValueError(
                             "h1_watch.png のサイズが異なります。"
                         )
@@ -245,7 +245,7 @@ def main():
                     OUTPUT_DIR / "h1_watch.png"
                 )
 
-                print("生成成功: h1_watch.png 710x257")
+                print("生成成功: h1_watch.png 710x207")
 
         finally:
 
@@ -280,7 +280,7 @@ def main():
     print("\n===== 更新完了 =====")
 
     print("jh.png / h2.png / h1.png / h3.png")
-    print("h1_watch.png 710x257px")
+    print("h1_watch.png 710x207px")
 
     print("すべての画像の生成が完了しました。")
 
