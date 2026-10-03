@@ -84,7 +84,7 @@ def main():
     outputs_exist = all(
         (OUTPUT_DIR / f"{name}.png").exists()
         for name in REGIONS
-    )
+    ) and (OUTPUT_DIR / "h1_watch.png").exists()
 
     if current_hash == previous_hash and outputs_exist:
         print("画像に変更はありません。")
@@ -155,8 +155,31 @@ def main():
                 )
 
             # 4枚すべて検証できたら正式な名前に変更
-            for temp_path, final_path in temporary_files:
-                temp_path.replace(final_path)
+                    # Apple Watch用の横長画像を作成
+        with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+            watch_source.load()
+
+            # 710×302pxの白いキャンバスを作成
+            watch_image = Image.new(
+                "RGB",
+                (710, 302),
+                (255, 255, 255)
+            )
+
+            # 元画像を中央に配置
+            watch_image.paste(
+                watch_source,
+                (121, 0)
+            )
+
+            # PNGとして保存
+            watch_image.save(
+                OUTPUT_DIR / "h1_watch.png",
+                format="PNG",
+                optimize=False
+            )
+
+        print("生成成功: h1_watch.png 710x302")
 
         finally:
             # 残った一時ファイルを削除
