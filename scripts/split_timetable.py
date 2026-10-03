@@ -160,7 +160,49 @@ def main():
                 temp_path.replace(final_path)
 
             # Apple Watch用の横長画像を作成
-            with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+                        with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+                watch_source.load()
+
+                if watch_source.size != CROP_SIZE:
+                    raise ValueError(
+                        "h1.png のサイズが想定と異なります。"
+                    )
+
+                # 上部45pxを削除
+                cropped = watch_source.crop(
+                    (0, 45, 468, 302)
+                )
+
+                # 左右に余白を付けた画像を作成
+                watch_image = Image.new(
+                    "RGB",
+                    (710, 257),
+                    (255, 255, 255)
+                )
+                watch_image.paste(cropped, (121, 0))
+
+                watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
+                watch_image.save(
+                    watch_temp,
+                    format="PNG",
+                    optimize=False
+                )
+
+                with Image.open(watch_temp) as check:
+                    check.load()
+                    if check.size != (710, 257):
+                        raise ValueError(
+                            "h1_watch.png のサイズが異なります。"
+                        )
+                    if check.format != "PNG":
+                        raise ValueError(
+                            "h1_watch.png がPNGではありません。"
+                        )
+
+                watch_temp.replace(
+                    OUTPUT_DIR / "h1_watch.png"
+                )
+                print("生成成功: h1_watch.png 710x257")
                 watch_source.load()
 
                 if watch_source.size != CROP_SIZE:
