@@ -7,7 +7,11 @@ from io import BytesIO
 from pathlib import Path
 from PIL import Image
 
-# GoogleスプレッドシートのID
+
+# ========================================
+# 基本設定
+# ========================================
+
 SHEET_ID = "1fdSGqT1s2kit91TcQV_mjcuvOawGAU6JZ_5N684bH3U"
 
 URL = (
@@ -15,18 +19,16 @@ URL = (
     f"{SHEET_ID}/export?format=xlsx"
 )
 
-# 保存先
 OUTPUT_DIR = Path("output")
 STATE_DIR = Path("state")
 HASH_FILE = STATE_DIR / "source.sha256"
 
-# Excel内の元画像
 IMAGE_PATH = "xl/media/image1.jpg"
 
 EXPECTED_SIZE = (960, 720)
 CROP_SIZE = (468, 302)
 
-# 4枚の切り抜き範囲
+# 元画像から切り出す範囲
 REGIONS = {
     "jh": (5, 10, 473, 312),
     "h2": (485, 10, 953, 312),
@@ -35,8 +37,11 @@ REGIONS = {
 }
 
 
+# ========================================
+# GitHub Actionsへの結果出力
+# ========================================
+
 def set_output(name, value):
-    """GitHub Actionsに結果を渡す"""
     output_file = os.environ.get("GITHUB_OUTPUT")
 
     if output_file:
@@ -44,10 +49,15 @@ def set_output(name, value):
             f.write(f"{name}={value}\n")
 
 
+# ========================================
+# メイン処理
+# ========================================
+
 def main():
+
     print("時間割画像の取得を開始します。")
 
-    # Excelファイルをダウンロード
+    # GoogleスプレッドシートからExcelを取得
     request = urllib.request.Request(
         URL,
         headers={"User-Agent": "Mozilla/5.0"}
@@ -58,8 +68,9 @@ def main():
 
     print(f"ダウンロード成功: {len(excel_data):,} bytes")
 
-    # Excelから元画像を取り出す
+    # Excelファイルから元画像を取り出す
     with zipfile.ZipFile(BytesIO(excel_data)) as archive:
+
         if IMAGE_PATH not in archive.namelist():
             raise FileNotFoundError(
                 f"{IMAGE_PATH} が見つかりません。"
@@ -72,7 +83,6 @@ def main():
     # 元画像のハッシュ値を計算
     current_hash = hashlib.sha256(jpeg_data).hexdigest()
 
-    # 前回のハッシュ値を確認
     previous_hash = None
 
     if HASH_FILE.exists():
@@ -80,24 +90,30 @@ def main():
             encoding="utf-8"
         ).strip()
 
-    # 必要な画像がすべて存在するか確認
+    # 出力画像がすべて存在するか確認
     outputs_exist = all(
         (OUTPUT_DIR / f"{name}.png").exists()
         for name in REGIONS
     ) and (OUTPUT_DIR / "h1_watch.png").exists()
 
-    # 画像が変更されていなければ終了
+    # 画像に変更がなければ処理を省略
     if current_hash == previous_hash and outputs_exist:
+
         print("画像に変更はありません。")
-        print("4分割処理を省略します。")
+        print("画像生成処理を省略します。")
+
         set_output("changed", "false")
         return
 
     print("画像の変更、または不足ファイルを検出しました。")
     print("画像生成を開始します。")
 
-    # 元画像を開く
+    # ========================================
+    # 元画像を読み込む
+    # ========================================
+
     with Image.open(BytesIO(jpeg_data)) as source:
+
         source.load()
 
         print(f"元画像サイズ: {source.size}")
@@ -113,10 +129,16 @@ def main():
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
         temporary_files = []
+        watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
 
         try:
-            # 4枚に切り抜く
+
+            # ========================================
+            # 4枚の画像を切り出す
+            # ========================================
+
             for name, coordinates in REGIONS.items():
+
                 image = source.crop(coordinates)
 
                 if image.size != CROP_SIZE:
@@ -132,8 +154,9 @@ def main():
                     optimize=False
                 )
 
-                # 保存したPNGを検証
+                # 保存した画像を確認
                 with Image.open(temp_path) as check:
+
                     check.load()
 
                     if check.size != CROP_SIZE:
@@ -155,12 +178,16 @@ def main():
                     f"{image.width}x{image.height}"
                 )
 
-            # 4枚すべて検証できたら正式な名前に変更
+            # 4枚の画像を正式なファイル名に変更
             for temp_path, final_path in temporary_files:
                 temp_path.replace(final_path)
 
-            # Apple Watch用の横長画像を作成
-                        with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+            # ========================================
+            # Apple Watch用画像を作成
+            # ========================================
+
+            with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+
                 watch_source.load()
 
                 if watch_source.size != CROP_SIZE:
@@ -169,74 +196,41 @@ def main():
                     )
 
                 # 上部45pxを削除
+                # 元画像468x302px → 468x257px
                 cropped = watch_source.crop(
                     (0, 45, 468, 302)
                 )
 
-                # 左右に余白を付けた画像を作成
+                if cropped.size != (468, 257):
+                    raise ValueError(
+                        "上部45px削除後のサイズが異なります。"
+                    )
+
+                # 左右に121pxずつ白い余白を追加
                 watch_image = Image.new(
                     "RGB",
                     (710, 257),
                     (255, 255, 255)
                 )
-                watch_image.paste(cropped, (121, 0))
 
-                watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
-                watch_image.save(
-                    watch_temp,
-                    format="PNG",
-                    optimize=False
-                )
-
-                with Image.open(watch_temp) as check:
-                    check.load()
-                    if check.size != (710, 257):
-                        raise ValueError(
-                            "h1_watch.png のサイズが異なります。"
-                        )
-                    if check.format != "PNG":
-                        raise ValueError(
-                            "h1_watch.png がPNGではありません。"
-                        )
-
-                watch_temp.replace(
-                    OUTPUT_DIR / "h1_watch.png"
-                )
-                print("生成成功: h1_watch.png 710x257")
-                watch_source.load()
-
-                if watch_source.size != CROP_SIZE:
-                    raise ValueError(
-                        "h1.png のサイズが想定と異なります。"
-                    )
-
-                # 710×302pxの白いキャンバス
-                watch_image = Image.new(
-                    "RGB",
-                    (710, 302),
-                    (255, 255, 255)
-                )
-
-                # 元画像を中央に配置
                 watch_image.paste(
-                    watch_source,
+                    cropped,
                     (121, 0)
                 )
 
-                # 一時ファイルに保存
-                watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
-
+                # 一時ファイルとして保存
                 watch_image.save(
                     watch_temp,
                     format="PNG",
                     optimize=False
                 )
 
-                # 保存した画像を検証
+                # 保存した画像を確認
                 with Image.open(watch_temp) as check:
+
                     check.load()
 
-                    if check.size != (710, 302):
+                    if check.size != (710, 257):
                         raise ValueError(
                             "h1_watch.png のサイズが異なります。"
                         )
@@ -251,19 +245,23 @@ def main():
                     OUTPUT_DIR / "h1_watch.png"
                 )
 
-                print("生成成功: h1_watch.png 710x302")
+                print("生成成功: h1_watch.png 710x257")
 
         finally:
-            # 残った一時ファイルを削除
+
+            # 途中で失敗した場合、一時ファイルを削除
             for temp_path, _ in temporary_files:
+
                 if temp_path.exists():
                     temp_path.unlink()
 
-            watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
             if watch_temp.exists():
                 watch_temp.unlink()
 
-    # 今回のハッシュ値を保存
+    # ========================================
+    # ハッシュ値を保存
+    # ========================================
+
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     temp_hash_file = STATE_DIR / "source.sha256.tmp"
@@ -275,9 +273,15 @@ def main():
 
     temp_hash_file.replace(HASH_FILE)
 
+    # ========================================
+    # 完了
+    # ========================================
+
     print("\n===== 更新完了 =====")
+
     print("jh.png / h2.png / h1.png / h3.png")
-    print("h1_watch.png 710x302px")
+    print("h1_watch.png 710x257px")
+
     print("すべての画像の生成が完了しました。")
 
     set_output("changed", "true")
