@@ -80,20 +80,21 @@ def main():
             encoding="utf-8"
         ).strip()
 
-    # 画像が変更されていない場合は終了
+    # 必要な画像がすべて存在するか確認
     outputs_exist = all(
         (OUTPUT_DIR / f"{name}.png").exists()
         for name in REGIONS
     ) and (OUTPUT_DIR / "h1_watch.png").exists()
 
+    # 画像が変更されていなければ終了
     if current_hash == previous_hash and outputs_exist:
         print("画像に変更はありません。")
         print("4分割処理を省略します。")
         set_output("changed", "false")
         return
 
-    print("画像の変更を検出しました。")
-    print("4分割処理を開始します。")
+    print("画像の変更、または不足ファイルを検出しました。")
+    print("画像生成を開始します。")
 
     # 元画像を開く
     with Image.open(BytesIO(jpeg_data)) as source:
@@ -155,31 +156,60 @@ def main():
                 )
 
             # 4枚すべて検証できたら正式な名前に変更
-                    # Apple Watch用の横長画像を作成
-        with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
-            watch_source.load()
+            for temp_path, final_path in temporary_files:
+                temp_path.replace(final_path)
 
-            # 710×302pxの白いキャンバスを作成
-            watch_image = Image.new(
-                "RGB",
-                (710, 302),
-                (255, 255, 255)
-            )
+            # Apple Watch用の横長画像を作成
+            with Image.open(OUTPUT_DIR / "h1.png") as watch_source:
+                watch_source.load()
 
-            # 元画像を中央に配置
-            watch_image.paste(
-                watch_source,
-                (121, 0)
-            )
+                if watch_source.size != CROP_SIZE:
+                    raise ValueError(
+                        "h1.png のサイズが想定と異なります。"
+                    )
 
-            # PNGとして保存
-            watch_image.save(
-                OUTPUT_DIR / "h1_watch.png",
-                format="PNG",
-                optimize=False
-            )
+                # 710×302pxの白いキャンバス
+                watch_image = Image.new(
+                    "RGB",
+                    (710, 302),
+                    (255, 255, 255)
+                )
 
-        print("生成成功: h1_watch.png 710x302")
+                # 元画像を中央に配置
+                watch_image.paste(
+                    watch_source,
+                    (121, 0)
+                )
+
+                # 一時ファイルに保存
+                watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
+
+                watch_image.save(
+                    watch_temp,
+                    format="PNG",
+                    optimize=False
+                )
+
+                # 保存した画像を検証
+                with Image.open(watch_temp) as check:
+                    check.load()
+
+                    if check.size != (710, 302):
+                        raise ValueError(
+                            "h1_watch.png のサイズが異なります。"
+                        )
+
+                    if check.format != "PNG":
+                        raise ValueError(
+                            "h1_watch.png がPNGではありません。"
+                        )
+
+                # 正式なファイル名に変更
+                watch_temp.replace(
+                    OUTPUT_DIR / "h1_watch.png"
+                )
+
+                print("生成成功: h1_watch.png 710x302")
 
         finally:
             # 残った一時ファイルを削除
@@ -187,19 +217,26 @@ def main():
                 if temp_path.exists():
                     temp_path.unlink()
 
+            watch_temp = OUTPUT_DIR / "h1_watch.tmp.png"
+            if watch_temp.exists():
+                watch_temp.unlink()
+
     # 今回のハッシュ値を保存
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     temp_hash_file = STATE_DIR / "source.sha256.tmp"
+
     temp_hash_file.write_text(
         current_hash + "\n",
         encoding="utf-8"
     )
+
     temp_hash_file.replace(HASH_FILE)
 
     print("\n===== 更新完了 =====")
     print("jh.png / h2.png / h1.png / h3.png")
-    print("すべて468x302pxのPNGです。")
+    print("h1_watch.png 710x302px")
+    print("すべての画像の生成が完了しました。")
 
     set_output("changed", "true")
 
